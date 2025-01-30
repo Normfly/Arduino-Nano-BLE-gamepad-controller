@@ -28,6 +28,7 @@ import com.example.blecontroller.BluetoothManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BLEController";
@@ -38,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothGattCharacteristic characteristic;
     private static final UUID SERVICE_UUID = UUID.fromString("12345678-1234-5678-1234-56789abcdef0");
     private static final UUID CHARACTERISTIC_UUID = UUID.fromString("87654321-4321-6789-4321-6789abcdef01");
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     private List<String> deviceNameList = new ArrayList<>(); // List to store device names
     private List<BluetoothDevice> bluetoothDeviceList = new ArrayList<>(); // List to store BluetoothDevice objects
@@ -56,7 +58,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Initialize ListView and its adapter
+        // Initialize SwipeRefreshLayout and ListView
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh_layout);
         deviceListView = findViewById(R.id.device_list_view);
         deviceListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, deviceNameList);
         deviceListView.setAdapter(deviceListAdapter);
@@ -67,8 +70,24 @@ public class MainActivity extends AppCompatActivity {
             deviceListView.setEnabled(false); // Disable the ListView
         });
 
+        // Set the refresh listener on the SwipeRefreshLayout
+        swipeRefreshLayout.setOnRefreshListener(this::refreshDeviceList);
+
         // Request necessary permissions
         requestPermissions();
+    }
+
+    private void refreshDeviceList() {
+        // Clear the current device lists
+        deviceNameList.clear();
+        bluetoothDeviceList.clear();
+        deviceListAdapter.notifyDataSetChanged();
+
+        // Start a new BLE scan
+        startBleScan();
+
+        // Stop the refreshing animation
+        swipeRefreshLayout.setRefreshing(false);
     }
 
     private void requestPermissions() {

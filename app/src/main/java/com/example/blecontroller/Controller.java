@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.Button;
 import android.content.pm.ActivityInfo;
 import androidx.appcompat.app.AppCompatActivity;
+import android.content.Intent;
 
 public class Controller extends AppCompatActivity {
     private static final String TAG = "ControllerActivity";
@@ -40,6 +41,14 @@ public class Controller extends AppCompatActivity {
         setButtonTouchListener(R.id.bBack, 'B');
         setButtonTouchListener(R.id.bCW, 'C');
         setButtonTouchListener(R.id.bCCW, 'W');
+    }
+
+    @Override
+    public void onBackPressed() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+        finish();
     }
 
     // Method to set touch listener for each button
