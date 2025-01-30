@@ -195,7 +195,7 @@ public class MainActivity extends AppCompatActivity {
                     if (characteristic != null) {
                         BluetoothManager.getInstance().setBluetoothGatt(gatt);
                         BluetoothManager.getInstance().setCharacteristic(characteristic);
-                        startControllerActivity();
+                        startControllerActivity(gatt.getDevice()); // Pass the BluetoothDevice here
                     } else {
                         Log.e(TAG, "Characteristic not found.");
                     }
@@ -232,8 +232,9 @@ public class MainActivity extends AppCompatActivity {
     };
 
     // After successful connection, start ControllerActivity
-    private void startControllerActivity() {
+    private void startControllerActivity(BluetoothDevice device) {
         Intent intent = new Intent(this, Controller.class);
+        intent.putExtra("DEVICE_ADDRESS", device.getAddress());
         startActivity(intent);
     }
 }

@@ -1,24 +1,76 @@
 package com.example.blecontroller;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothProfile;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
-import android.content.pm.ActivityInfo;
+import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import android.content.Intent;
+
+import java.util.UUID;
 
 public class Controller extends AppCompatActivity {
     private static final String TAG = "ControllerActivity";
+    private static final UUID SERVICE_UUID = UUID.fromString("12345678-1234-5678-1234-56789abcdef0");
+    private static final UUID CHARACTERISTIC_UUID = UUID.fromString("87654321-4321-6789-4321-6789abcdef01");
+    private static final UUID DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+
     private BluetoothGattCharacteristic characteristic;
     private BluetoothGatt bluetoothGatt;
     private Handler handler = new Handler();
     private boolean isSending = false;
     private char currentCharacter;
+    private TextView textView;  // Add a TextView reference
+
+    private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.i(TAG, "Connected to GATT server.");
+                gatt.discoverServices();
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(TAG, "Disconnected from GATT server.");
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                BluetoothGattService service = gatt.getService(SERVICE_UUID);
+                if (service != null) {
+                    characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
+                    if (characteristic != null) {
+                        BluetoothManager.getInstance().setBluetoothGatt(gatt);
+                        BluetoothManager.getInstance().setCharacteristic(characteristic);
+                        setupCharacteristicNotification(gatt, characteristic); // Enable notifications
+                    } else {
+                        Log.e(TAG, "Characteristic not found.");
+                    }
+                } else {
+                    Log.e(TAG, "Service not found.");
+                }
+            } else {
+                Log.e(TAG, "onServicesDiscovered received: " + status);
+            }
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            processReceivedData(characteristic);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,9 +80,8 @@ public class Controller extends AppCompatActivity {
         // Force the activity to display in landscape orientation
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
-        // Get the BluetoothGatt and BluetoothGattCharacteristic from the Singleton
-        bluetoothGatt = BluetoothManager.getInstance().getBluetoothGatt();
-        characteristic = BluetoothManager.getInstance().getCharacteristic();
+        // Get the TextView reference
+        textView = findViewById(R.id.textView);
 
         // Set up buttons to handle continuous press
         setButtonTouchListener(R.id.bUp, 'U');
@@ -41,6 +92,21 @@ public class Controller extends AppCompatActivity {
         setButtonTouchListener(R.id.bBack, 'B');
         setButtonTouchListener(R.id.bCW, 'C');
         setButtonTouchListener(R.id.bCCW, 'W');
+
+        // Get the Bluetooth device address from the Intent
+        Intent intent = getIntent();
+        String deviceAddress = intent.getStringExtra("DEVICE_ADDRESS");
+        if (deviceAddress != null) {
+            BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(deviceAddress);
+            if (device != null) {
+                bluetoothGatt = device.connectGatt(this, false, gattCallback);
+            } else {
+                Log.e(TAG, "Failed to get BluetoothDevice from address");
+            }
+        } else {
+            Log.e(TAG, "No device address passed to Controller");
+        }
     }
 
     @Override
@@ -109,5 +175,28 @@ public class Controller extends AppCompatActivity {
         } else {
             Log.e(TAG, "Characteristic is null.");
         }
+    }
+
+    // Method to set up characteristic notification
+    private void setupCharacteristicNotification(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+        gatt.setCharacteristicNotification(characteristic, true);
+        BluetoothGattDescriptor descriptor = characteristic.getDescriptor(DESCRIPTOR_UUID);
+        if (descriptor != null) {
+            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            gatt.writeDescriptor(descriptor);
+        }
+    }
+
+    // Method to process received data
+    private void processReceivedData(BluetoothGattCharacteristic characteristic) {
+        String receivedString = characteristic.getStringValue(0);
+        Log.d(TAG, "Received data: " + receivedString);
+        // Handle the received string as needed, for example, update the UI or send a notification
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                textView.setText(receivedString);  // Update the TextView with the received string
+            }
+        });
     }
 }
