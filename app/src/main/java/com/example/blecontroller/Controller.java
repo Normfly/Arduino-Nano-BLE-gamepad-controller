@@ -33,6 +33,8 @@ public class Controller extends AppCompatActivity {
     private boolean isSending = false;
     private char currentCharacter;
     private TextView textView;  // Add a TextView reference
+    private Button bStartStop;
+    private boolean bStop = true;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -83,13 +85,16 @@ public class Controller extends AppCompatActivity {
         // Get the TextView reference
         textView = findViewById(R.id.textView);
 
+        // Get the Start/Stop button reference
+        bStartStop = findViewById(R.id.bStartStop);
+
         // Set up buttons to handle continuous press
         setButtonTouchListener(R.id.bUp, 'U');
         setButtonTouchListener(R.id.bForward, 'F');
         setButtonTouchListener(R.id.bDown, 'D');
         setButtonTouchListener(R.id.bLeft, 'L');
         setButtonTouchListener(R.id.bRight, 'R');
-        setButtonTouchListener(R.id.bBack, 'B');
+        setButtonTouchListener(R.id.bStartStop, 'S');
         setButtonTouchListener(R.id.bCW, 'C');
         setButtonTouchListener(R.id.bCCW, 'W');
 
@@ -128,6 +133,15 @@ public class Controller extends AppCompatActivity {
                         startSendingCharacter(character);
                         return true;
                     case MotionEvent.ACTION_UP:
+                        if (character == 'S') {
+                            if (bStop) {
+                                bStartStop.setText("Start");
+                            } else {
+                                bStartStop.setText("Stop");
+                            };
+                            bStop = !bStop;
+                            startSendingCharacter(character);
+                        };
                     case MotionEvent.ACTION_CANCEL:
                         stopSendingCharacter();
                         return true;

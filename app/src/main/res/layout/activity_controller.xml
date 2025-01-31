@@ -95,7 +95,20 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/bBack"
+        android:id="@+id/bStartStop"
+        android:layout_width="137dp"
+        android:layout_height="83dp"
+        android:onClick="Back_Clicked"
+        android:text="Stop"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.525"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.887" />
+
+    <Button
+        android:id="@+id/bBack2"
         android:layout_width="137dp"
         android:layout_height="83dp"
         android:onClick="Back_Clicked"
