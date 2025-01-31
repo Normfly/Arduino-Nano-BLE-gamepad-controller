@@ -91,6 +91,7 @@ public class Controller extends AppCompatActivity {
         // Set up buttons to handle continuous press
         setButtonTouchListener(R.id.bUp, 'U');
         setButtonTouchListener(R.id.bForward, 'F');
+        setButtonTouchListener(R.id.bBack, 'B');
         setButtonTouchListener(R.id.bDown, 'D');
         setButtonTouchListener(R.id.bLeft, 'L');
         setButtonTouchListener(R.id.bRight, 'R');
