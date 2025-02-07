@@ -196,6 +196,12 @@ public class Controller extends AppCompatActivity {
             } else {
                 Log.e(TAG, "Failed to write character to characteristic");
             }
+            // Add a short delay after writing to help avoid BLE disconnects
+            try {
+                Thread.sleep(50); // Adjust the delay as needed
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         } else {
             Log.e(TAG, "Characteristic is null.");
         }
