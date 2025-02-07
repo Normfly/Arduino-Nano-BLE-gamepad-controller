@@ -17,6 +17,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.UUID;
@@ -35,6 +36,7 @@ public class Controller extends AppCompatActivity {
     private TextView textView;  // Add a TextView reference
     private Button bStartStop;
     private boolean bStop = true;
+    private String deviceAddress;  // Store the device address
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -44,6 +46,13 @@ public class Controller extends AppCompatActivity {
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "Disconnected from GATT server.");
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        textView.setText("BLE disconnected");
+                        attemptReconnect();  // Attempt to reconnect
+                    }
+                });
             }
         }
 
@@ -101,15 +110,9 @@ public class Controller extends AppCompatActivity {
 
         // Get the Bluetooth device address from the Intent
         Intent intent = getIntent();
-        String deviceAddress = intent.getStringExtra("DEVICE_ADDRESS");
+        deviceAddress = intent.getStringExtra("DEVICE_ADDRESS");
         if (deviceAddress != null) {
-            BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(deviceAddress);
-            if (device != null) {
-                bluetoothGatt = device.connectGatt(this, false, gattCallback);
-            } else {
-                Log.e(TAG, "Failed to get BluetoothDevice from address");
-            }
+            connectToDevice(deviceAddress);
         } else {
             Log.e(TAG, "No device address passed to Controller");
         }
@@ -117,6 +120,12 @@ public class Controller extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        //disconnect from BLE, if connected
+        if (bluetoothGatt != null) {
+            bluetoothGatt.disconnect();
+            bluetoothGatt.close();
+        }
+        //return to MainActivity
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
@@ -213,5 +222,35 @@ public class Controller extends AppCompatActivity {
                 textView.setText(receivedString);  // Update the TextView with the received string
             }
         });
+    }
+
+    // Method to attempt reconnecting to the BLE device
+    private void attemptReconnect() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(Controller.this, "Attempting to reconnect to BLE device...", Toast.LENGTH_SHORT).show();
+            }
+        });
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (deviceAddress != null) {
+                    Log.i(TAG, "Attempting to reconnect to BLE device...");
+                    connectToDevice(deviceAddress);
+                }
+            }
+        }, 5000);  // Adjust the delay as needed
+    }
+
+    // Method to connect to a BLE device
+    private void connectToDevice(String address) {
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
+        if (device != null) {
+            bluetoothGatt = device.connectGatt(this, false, gattCallback);
+        } else {
+            Log.e(TAG, "Failed to get BluetoothDevice from address");
+        }
     }
 }
