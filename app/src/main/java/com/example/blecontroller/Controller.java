@@ -20,6 +20,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.UUID;
 
 public class Controller extends AppCompatActivity {
@@ -33,10 +35,13 @@ public class Controller extends AppCompatActivity {
     private Handler handler = new Handler();
     private boolean isSending = false;
     private char currentCharacter;
-    private TextView textView;  // Add a TextView reference
+    private TextView textView;
     private Button bStartStop;
     private boolean bStop = true;
-    private String deviceAddress;  // Store the device address
+    private String deviceAddress;
+
+    private Queue<Character> writeQueue = new LinkedList<>();
+    private boolean isWriting = false;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -46,13 +51,11 @@ public class Controller extends AppCompatActivity {
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "Disconnected from GATT server.");
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        textView.setText("BLE disconnected");
-                        attemptReconnect();  // Attempt to reconnect
-                    }
+                runOnUiThread(() -> {
+                    textView.setText("BLE disconnected");
+                    attemptReconnect();
                 });
+                cleanup();
             }
         }
 
@@ -65,7 +68,7 @@ public class Controller extends AppCompatActivity {
                     if (characteristic != null) {
                         BluetoothManager.getInstance().setBluetoothGatt(gatt);
                         BluetoothManager.getInstance().setCharacteristic(characteristic);
-                        setupCharacteristicNotification(gatt, characteristic); // Enable notifications
+                        setupCharacteristicNotification(gatt, characteristic);
                     } else {
                         Log.e(TAG, "Characteristic not found.");
                     }
@@ -81,6 +84,17 @@ public class Controller extends AppCompatActivity {
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             processReceivedData(characteristic);
         }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "Characteristic write successful");
+                processNextWrite();
+            } else {
+                Log.e(TAG, "Characteristic write failed, status: " + status);
+                attemptReconnect();
+            }
+        }
     };
 
     @Override
@@ -88,16 +102,11 @@ public class Controller extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_controller);
 
-        // Force the activity to display in landscape orientation
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
-        // Get the TextView reference
         textView = findViewById(R.id.textView);
-
-        // Get the Start/Stop button reference
         bStartStop = findViewById(R.id.bStartStop);
 
-        // Set up buttons to handle continuous press
         setButtonTouchListener(R.id.bUp, 'U');
         setButtonTouchListener(R.id.bForward, 'F');
         setButtonTouchListener(R.id.bBack, 'B');
@@ -108,7 +117,6 @@ public class Controller extends AppCompatActivity {
         setButtonTouchListener(R.id.bCW, 'C');
         setButtonTouchListener(R.id.bCCW, 'W');
 
-        // Get the Bluetooth device address from the Intent
         Intent intent = getIntent();
         deviceAddress = intent.getStringExtra("DEVICE_ADDRESS");
         if (deviceAddress != null) {
@@ -120,48 +128,34 @@ public class Controller extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        //disconnect from BLE, if connected
-        if (bluetoothGatt != null) {
-            bluetoothGatt.disconnect();
-            bluetoothGatt.close();
-        }
-        //return to MainActivity
+        cleanup();
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
         finish();
     }
 
-    // Method to set touch listener for each button
     private void setButtonTouchListener(int buttonId, final char character) {
         Button button = findViewById(buttonId);
-        button.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
+        button.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    startSendingCharacter(character);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (character == 'S') {
+                        bStartStop.setText(bStop ? "Start" : "Stop");
+                        bStop = !bStop;
                         startSendingCharacter(character);
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        if (character == 'S') {
-                            if (bStop) {
-                                bStartStop.setText("Start");
-                            } else {
-                                bStartStop.setText("Stop");
-                            };
-                            bStop = !bStop;
-                            startSendingCharacter(character);
-                        };
-                    case MotionEvent.ACTION_CANCEL:
-                        stopSendingCharacter();
-                        return true;
-                }
-                return false;
+                    }
+                case MotionEvent.ACTION_CANCEL:
+                    stopSendingCharacter();
+                    return true;
             }
+            return false;
         });
     }
 
-    // Start sending the character continuously
     private void startSendingCharacter(final char character) {
         if (!isSending) {
             isSending = true;
@@ -170,44 +164,52 @@ public class Controller extends AppCompatActivity {
                 @Override
                 public void run() {
                     if (isSending && currentCharacter == character) {
-                        writeSingleCharacter(character);
-                        handler.postDelayed(this, 100); // Adjust the delay as needed
+                        queueWriteCharacter(character);
+                        handler.postDelayed(this, 100);
                     }
                 }
             });
         }
     }
 
-    // Stop sending the character
     private void stopSendingCharacter() {
         isSending = false;
         handler.removeCallbacksAndMessages(null);
     }
 
-    // Method to write a single character to the BLE characteristic
+    private void queueWriteCharacter(char character) {
+        writeQueue.add(character);
+        if (!isWriting) {
+            processNextWrite();
+        }
+    }
+
+    private void processNextWrite() {
+        if (!writeQueue.isEmpty()) {
+            char character = writeQueue.poll();
+            writeSingleCharacter(character);
+        } else {
+            isWriting = false;
+        }
+    }
+
     private void writeSingleCharacter(char character) {
-        if (characteristic != null) {
-            // Set the value of the characteristic to the character
+        if (characteristic != null && bluetoothGatt != null) {
+            isWriting = true;
             characteristic.setValue(String.valueOf(character));
-            // Write the characteristic
             boolean success = bluetoothGatt.writeCharacteristic(characteristic);
             if (success) {
                 Log.d(TAG, "Successfully wrote character to characteristic");
             } else {
                 Log.e(TAG, "Failed to write character to characteristic");
-            }
-            // Add a short delay after writing to help avoid BLE disconnects
-            try {
-                Thread.sleep(50); // Adjust the delay as needed
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                processNextWrite();
             }
         } else {
-            Log.e(TAG, "Characteristic is null.");
+            Log.e(TAG, "Characteristic or BluetoothGatt is null.");
+            processNextWrite();
         }
     }
 
-    // Method to set up characteristic notification
     private void setupCharacteristicNotification(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
         gatt.setCharacteristicNotification(characteristic, true);
         BluetoothGattDescriptor descriptor = characteristic.getDescriptor(DESCRIPTOR_UUID);
@@ -217,39 +219,22 @@ public class Controller extends AppCompatActivity {
         }
     }
 
-    // Method to process received data
     private void processReceivedData(BluetoothGattCharacteristic characteristic) {
         String receivedString = characteristic.getStringValue(0);
         Log.d(TAG, "Received data: " + receivedString);
-        // Handle the received string as needed, for example, update the UI or send a notification
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                textView.setText(receivedString);  // Update the TextView with the received string
-            }
-        });
+        runOnUiThread(() -> textView.setText(receivedString));
     }
 
-    // Method to attempt reconnecting to the BLE device
     private void attemptReconnect() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(Controller.this, "Attempting to reconnect to BLE device...", Toast.LENGTH_SHORT).show();
+        runOnUiThread(() -> Toast.makeText(Controller.this, "Attempting to reconnect to BLE device...", Toast.LENGTH_SHORT).show());
+        handler.postDelayed(() -> {
+            if (deviceAddress != null) {
+                Log.i(TAG, "Attempting to reconnect to BLE device...");
+                connectToDevice(deviceAddress);
             }
-        });
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (deviceAddress != null) {
-                    Log.i(TAG, "Attempting to reconnect to BLE device...");
-                    connectToDevice(deviceAddress);
-                }
-            }
-        }, 5000);  // Adjust the delay as needed
+        }, 5000);
     }
 
-    // Method to connect to a BLE device
     private void connectToDevice(String address) {
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
@@ -258,5 +243,17 @@ public class Controller extends AppCompatActivity {
         } else {
             Log.e(TAG, "Failed to get BluetoothDevice from address");
         }
+    }
+
+    private void cleanup() {
+        if (bluetoothGatt != null) {
+            bluetoothGatt.disconnect();
+            bluetoothGatt.close();
+            bluetoothGatt = null;
+        }
+        isSending = false;
+        handler.removeCallbacksAndMessages(null);
+        writeQueue.clear();
+        isWriting = false;
     }
 }
