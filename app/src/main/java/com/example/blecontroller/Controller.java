@@ -42,6 +42,8 @@ public class Controller extends AppCompatActivity {
 
     private Queue<Character> writeQueue = new LinkedList<>();
     private boolean isWriting = false;
+    private int writeFailureCount = 0;
+    private static final int MAX_WRITE_FAILURES = 3;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -89,10 +91,16 @@ public class Controller extends AppCompatActivity {
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d(TAG, "Characteristic write successful");
+                writeFailureCount = 0; // Reset failure count on success
                 processNextWrite();
             } else {
                 Log.e(TAG, "Characteristic write failed, status: " + status);
-                attemptReconnect();
+                writeFailureCount++;
+                if (writeFailureCount >= MAX_WRITE_FAILURES) {
+                    attemptReconnect();
+                } else {
+                    processNextWrite();
+                }
             }
         }
     };
