@@ -43,7 +43,7 @@ public class Controller extends AppCompatActivity {
     private Queue<Character> writeQueue = new LinkedList<>();
     private boolean isWriting = false;
     private int writeFailureCount = 0;
-    private static final int MAX_WRITE_FAILURES = 3;
+    private static final int MAX_WRITE_FAILURES = 1;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -124,6 +124,7 @@ public class Controller extends AppCompatActivity {
         setButtonTouchListener(R.id.bStartStop, 'S');
         setButtonTouchListener(R.id.bCW, 'C');
         setButtonTouchListener(R.id.bCCW, 'W');
+        setButtonTouchListener(R.id.bOption, 'O');
 
         Intent intent = getIntent();
         deviceAddress = intent.getStringExtra("DEVICE_ADDRESS");
@@ -152,7 +153,7 @@ public class Controller extends AppCompatActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (character == 'S') {
-                        bStartStop.setText(bStop ? "Start" : "Stop");
+                        //bStartStop.setText(bStop ? "Start" : "Stop");
                         bStop = !bStop;
                         startSendingCharacter(character);
                     }

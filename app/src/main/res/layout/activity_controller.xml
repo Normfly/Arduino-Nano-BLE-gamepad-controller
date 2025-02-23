@@ -95,17 +95,32 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/bStartStop"
+        android:id="@+id/bOption"
         android:layout_width="137dp"
         android:layout_height="83dp"
+        android:backgroundTint="#1F39C7"
         android:onClick="Back_Clicked"
-        android:text="Stop"
+        android:text="Options"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.525"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.887" />
+        app:layout_constraintVertical_bias="0.246" />
+
+    <Button
+        android:id="@+id/bStartStop"
+        android:layout_width="137dp"
+        android:layout_height="83dp"
+        android:onClick="Back_Clicked"
+        android:text="Stop/Start"
+        app:backgroundTint="#17891C"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.525"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.804" />
 
     <Button
         android:id="@+id/bBack"
